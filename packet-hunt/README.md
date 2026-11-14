@@ -10,9 +10,13 @@ An interactive cybersecurity training game about Wireshark and Nmap, made for th
 5. **Intrusion Showdown**: a timed boss round, followed by a certificate
 
 ## Deploy on GitHub Pages
-1. Create a new public repository and upload `index.html`, `.nojekyll` and this README to the root.
-2. Go to **Settings → Pages**.
-3. Under **Build and deployment**, set the source to **Deploy from a branch**, choose `main` and `/ (root)`, then save.
-4. After a minute or so the game is live at `https://<your-username>.github.io/<repo-name>/`.
+Deployment is automated with Node.js and GitHub Actions.
 
-It's a single self-contained HTML file with no build step. Progress is saved in each player's browser (localStorage).
+1. Push to `main`.
+2. In the repo go to **Settings → Pages** and set **Source** to **GitHub Actions** (one-time).
+3. The workflow in `.github/workflows/pages.yml` runs `npm run build` (`scripts/build.js`) and publishes `dist/`.
+4. The game goes live at `https://<your-username>.github.io/<repo-name>/`.
+
+Preview locally (Node 18+): `npm run build && npm start`, then open http://localhost:3000.
+
+The game is a single self-contained HTML file. Progress is saved in each player's browser (localStorage).
