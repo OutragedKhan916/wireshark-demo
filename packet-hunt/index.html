@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Operation: Packet Hunt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=JetBrains+Mono:wght@400;600;800&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#040a18;--panel:rgba(10,22,48,.82);--panel2:#0c1a38;--line:#1d3769;--line2:#2a4d8f;
+  --cyan:#3fd0ff;--blue:#2f6bff;--green:#39ff9f;--red:#ff4d6d;--amber:#ffc94d;--violet:#a98bff;
+  --text:#dbe7ff;--dim:#8296c4;--mono:'JetBrains Mono',ui-monospace,monospace;--disp:'Orbitron',sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;min-height:100%}
+body{overflow-x:hidden}
+#bg{position:fixed;inset:0;z-index:0;pointer-events:none}
+body:after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px)}
+#hud{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:10px 14px;
+  background:rgba(4,10,24,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);font-family:var(--mono);font-size:13px}
+#hud .logo{font-family:var(--disp);font-weight:900;letter-spacing:2px;color:var(--cyan);font-size:13px;cursor:pointer;white-space:nowrap}
+#hud .sp{flex:1}
+.pill{padding:4px 10px;border:1px solid var(--line2);border-radius:999px;background:var(--panel2);white-space:nowrap}
+.pill b{color:var(--green)}
+.pill.streak b{color:var(--amber)}
+#hud button{background:none;border:1px solid var(--line2);color:var(--text);border-radius:8px;padding:4px 8px;cursor:pointer;font-size:14px}
+#app{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:18px 14px 80px}
+h1,h2,h3{margin:0}
+.disp{font-family:var(--disp);letter-spacing:1.5px}
+.glow{color:#fff;text-shadow:0 0 12px rgba(63,208,255,.7),0 0 28px rgba(47,107,255,.5)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+.btn{font:700 15px Inter,sans-serif;border:1px solid var(--line2);background:var(--panel2);color:var(--text);
+  padding:12px 18px;border-radius:12px;cursor:pointer;transition:.15s}
+.btn:hover{border-color:var(--cyan);transform:translateY(-1px)}
+.btn.primary{background:linear-gradient(135deg,#1f6bff,#18b6ff);border-color:transparent;color:#fff;box-shadow:0 0 22px rgba(47,140,255,.45)}
+.btn.primary:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn.ghost{background:transparent}
+.btn.sm{padding:7px 12px;font-size:13px;border-radius:9px}
+code,.mono{font-family:var(--mono)}
+code{background:#071229;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--cyan);font-size:.92em}
+.kicker{font:700 11px var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--cyan)}
+.dim{color:var(--dim)}
+.shake{animation:shake .35s}
+@keyframes shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.screen{animation:rise .35s ease}
+
+/* boot */
+.boot{min-height:78vh;display:flex;flex-direction:column;justify-content:center;gap:18px}
+.bootlog{font:13px/1.7 var(--mono);color:var(--green);min-height:120px}
+.bootlog .d{color:var(--dim)}
+.title{font-family:var(--disp);font-weight:900;font-size:clamp(30px,7vw,64px);line-height:1.05;letter-spacing:3px}
+.title .sub{display:block;font-size:.42em;letter-spacing:6px;color:var(--cyan);margin-bottom:8px}
+.glitch{position:relative;display:inline-block}
+.glitch:before,.glitch:after{content:attr(data-t);position:absolute;inset:0;opacity:.6}
+.glitch:before{color:#ff2bd6;animation:g1 2.6s infinite steps(1)}
+.glitch:after{color:#00fff0;animation:g2 3.1s infinite steps(1)}
+@keyframes g1{0%,92%,100%{transform:none;clip-path:inset(0 0 100% 0)}93%{transform:translate(-3px,1px);clip-path:inset(20% 0 50% 0)}96%{transform:translate(3px,-1px);clip-path:inset(60% 0 10% 0)}}
+@keyframes g2{0%,88%,100%{transform:none;clip-path:inset(0 0 100% 0)}89%{transform:translate(3px,0);clip-path:inset(10% 0 70% 0)}94%{transform:translate(-2px,1px);clip-path:inset(45% 0 30% 0)}}
+.field{display:flex;gap:10px;flex-wrap:wrap}
+.field input{flex:1;min-width:200px;background:#050d20;border:1px solid var(--line2);color:var(--text);
+  font:600 17px var(--mono);padding:13px 14px;border-radius:12px;outline:none}
+.field input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(63,208,255,.15)}
+.pledge{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--dim);cursor:pointer;line-height:1.45}
+.pledge input{margin-top:3px;width:18px;height:18px;accent-color:var(--cyan)}
+
+/* hub */
+.hubhead{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.missions{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.mcard{position:relative;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;
+  cursor:pointer;color:var(--text);font:inherit;transition:.2s;overflow:hidden}
+.mcard:hover:not(.locked){border-color:var(--cyan);transform:translateY(-3px);box-shadow:0 0 30px rgba(63,208,255,.18)}
+.mcard .ico{font-size:30px;margin-bottom:8px;display:block}
+.mcard h3{font-family:var(--disp);font-size:16px;letter-spacing:1px;margin-bottom:6px}
+.mcard p{margin:0;color:var(--dim);font-size:14px;line-height:1.45}
+.mcard .st{position:absolute;top:14px;right:14px;font:700 11px var(--mono);letter-spacing:1px}
+.mcard.locked{opacity:.45;cursor:not-allowed}
+.mcard.boss{grid-column:1/-1;border-color:rgba(255,77,109,.5);background:linear-gradient(135deg,rgba(60,8,24,.75),rgba(10,22,48,.85))}
+.mcard.boss h3{color:var(--red)}
+.stars{color:var(--amber);letter-spacing:2px}
+.mcard .num{font:800 11px var(--mono);color:var(--cyan);letter-spacing:2px}
+
+/* quiz */
+.qtop{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font:600 13px var(--mono);color:var(--dim)}
+.bar{height:6px;background:#0a1734;border-radius:9px;overflow:hidden;margin-bottom:18px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--cyan));transition:width .4s}
+.tag{display:inline-block;font:700 11px var(--mono);letter-spacing:1.5px;color:#06142b;background:var(--cyan);padding:3px 8px;border-radius:6px;margin-bottom:10px;text-transform:uppercase}
+.q{font-size:clamp(19px,3.4vw,25px);line-height:1.35;font-weight:800;margin-bottom:16px}
+.opts{display:grid;gap:10px}
+.opts.grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.opt{display:flex;align-items:center;gap:12px;text-align:left;background:var(--panel2);border:1px solid var(--line2);color:var(--text);
+  font:600 16px Inter,sans-serif;padding:14px 16px;border-radius:12px;cursor:pointer;transition:.15s}
+.opt:hover:not(:disabled){border-color:var(--cyan);background:#0f2148}
+.opt .oi{font-size:22px}
+.opt.mono{font-family:var(--mono);font-size:14px}
+.opt.right{border-color:var(--green);background:rgba(57,255,159,.12);box-shadow:0 0 18px rgba(57,255,159,.25)}
+.opt.wrong{border-color:var(--red);background:rgba(255,77,109,.12)}
+.opt:disabled{cursor:default}
+.fb{margin:16px 0 12px;padding:14px 16px;border-radius:12px;line-height:1.5;font-size:15px}
+.fb.ok{background:rgba(57,255,159,.08);border:1px solid rgba(57,255,159,.4)}
+.fb.no{background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.4)}
+.fb b{display:block;margin-bottom:2px}
+.fb.ok b{color:var(--green)}.fb.no b{color:var(--red)}
+pre.code{background:#030916;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font:13px/1.55 var(--mono);color:#bfe9ff;overflow-x:auto;margin:0 0 16px}
+
+/* brief / objectives */
+.brief{display:flex;gap:14px;align-items:flex-start;margin-bottom:12px}
+.brief .av{flex:none;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:24px;background:linear-gradient(135deg,#123a7a,#0a2350);border:1px solid var(--line2)}
+.brief .msg{flex:1}
+.brief .who{font:700 11px var(--mono);color:var(--cyan);letter-spacing:2px;margin-bottom:3px}
+.brief .txt{font-size:16px;line-height:1.5;font-weight:600}
+.objs{display:flex;gap:6px;margin:4px 0 0;flex-wrap:wrap}
+.objs i{width:22px;height:6px;border-radius:4px;background:#13254d}
+.objs i.d{background:var(--green)}.objs i.c{background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+
+/* wireshark */
+.ws{border:1px solid var(--line2);border-radius:14px;overflow:hidden;background:#07112a}
+.ws-title{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#0c1a3a;border-bottom:1px solid var(--line);font:600 12px var(--mono);color:var(--dim)}
+.ws-title .fin{width:18px;height:18px}
+.ws-tool{display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);background:#0a1633;flex-wrap:wrap}
+.tbtn{width:40px;height:36px;border-radius:9px;border:1px solid var(--line2);background:#0d1d42;display:grid;place-items:center;cursor:pointer}
+.tbtn:disabled{opacity:.35;cursor:not-allowed}
+.tbtn.pulse{animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(63,208,255,.6)}50%{box-shadow:0 0 0 8px rgba(63,208,255,0)}}
+.filt{flex:1;display:flex;min-width:220px}
+.filt input{flex:1;min-width:0;font:600 14px var(--mono);padding:8px 10px;border-radius:9px 0 0 9px;border:1px solid var(--line2);border-right:none;background:#fff;color:#111;outline:none}
+.filt input.okf{background:#c8f7c5}.filt input.badf{background:#ffc9c9}
+.filt button{border-radius:0 9px 9px 0;border:1px solid var(--line2);background:#1a3a7a;color:#fff;font:700 13px Inter;padding:0 12px;cursor:pointer}
+.plist{height:clamp(220px,38vh,360px);overflow:auto;background:#050d20;position:relative}
+table.pk{border-collapse:collapse;width:100%;min-width:640px;font:12.5px var(--mono)}
+table.pk th{position:sticky;top:0;background:#12244c;color:#cfe0ff;text-align:left;padding:6px 8px;font-weight:600;border-bottom:1px solid var(--line2);z-index:1}
+table.pk td{padding:5px 8px;white-space:nowrap;color:#0b1020;border-bottom:1px solid rgba(0,0,0,.08);cursor:pointer}
+table.pk td.info{max-width:280px;overflow:hidden;text-overflow:ellipsis}
+tr.p-tcp td{background:#e7e6ff}tr.p-http td{background:#e4ffc7}tr.p-dns td{background:#daeeff}
+tr.p-arp td{background:#faf0d7}tr.p-tls td{background:#e7d9ff}tr.p-rst td{background:#a40000;color:#fffc9c}
+tr.p-syn td{background:#d0d0ff}
+tr.sel td{background:#2f6bff!important;color:#fff!important}
+tr.new td{animation:flash .6s}
+@keyframes flash{from{filter:brightness(1.6)}to{filter:none}}
+.empty{padding:40px 16px;text-align:center;color:var(--dim);font:13px var(--mono)}
+.details{border-top:2px solid var(--line2);background:#081530;padding:12px;font:12.5px/1.65 var(--mono);min-height:150px}
+.sumchips{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px}
+.sumchips div{background:#0d1f47;border:1px solid var(--line2);border-radius:10px;padding:7px 10px}
+.sumchips small{display:block;font:700 10px var(--mono);letter-spacing:1.5px;color:var(--cyan);text-transform:uppercase}
+.sumchips b{font-size:13px;color:#fff;word-break:break-all}
+.tree div{white-space:pre-wrap;color:#c5d6ff}
+.tree .l1{color:#fff;font-weight:600}
+.hex{margin-top:8px;color:#6f86b8;font-size:11.5px;white-space:pre;overflow-x:auto}
+
+/* modal */
+.modal{position:fixed;inset:0;z-index:40;background:rgba(2,6,16,.75);backdrop-filter:blur(4px);display:grid;place-items:center;padding:16px}
+.modal .card{max-width:560px;width:100%;animation:rise .25s}
+
+/* terminal */
+.term{border-radius:14px;overflow:hidden;border:1px solid #23314f;background:#02060f;box-shadow:0 0 40px rgba(57,255,159,.06)}
+.tbar{display:flex;align-items:center;gap:7px;padding:9px 12px;background:#121a2c;font:600 12px var(--mono);color:#93a4c8}
+.tbar i{width:11px;height:11px;border-radius:50%;display:inline-block}
+.tout{height:clamp(260px,44vh,440px);overflow:auto;padding:12px 14px;font:13px/1.55 var(--mono);color:#cfe6d8;white-space:pre-wrap;word-break:break-word}
+.tout .cmd{color:#fff}.tout .ps{color:var(--green)}
+.tout .err{color:#ff7a8f}.tout .warn{color:var(--amber)}.tout .ok{color:var(--green)}.tout .inf{color:var(--cyan)}
+.tout .open{color:var(--green)}.tout .closed{color:#ff7a8f}.tout .filtered{color:var(--amber)}
+.tin{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid #172238;background:#040b19}
+.tin .ps{font:700 13px var(--mono);color:var(--green);white-space:nowrap}
+.tin input{flex:1;min-width:0;background:transparent;border:none;outline:none;color:#fff;font:600 15px var(--mono);caret-color:var(--green)}
+.tin button{background:#0f3b26;border:1px solid #1c6b45;color:var(--green);border-radius:8px;font:700 12px var(--mono);padding:7px 10px;cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.chip{font:600 13px var(--mono);padding:7px 10px;border-radius:9px;border:1px solid var(--line2);background:var(--panel2);color:var(--cyan);cursor:pointer}
+.chip:hover{border-color:var(--cyan)}
+.chip.x{color:var(--dim)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+/* scan table */
+.scan{width:100%;border-collapse:separate;border-spacing:0 6px;font:13.5px var(--mono)}
+.scan th{text-align:left;color:var(--dim);font-size:11px;letter-spacing:1.5px;padding:0 10px}
+.scan td{background:#071330;padding:11px 10px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.scan td:first-child{border-left:1px solid var(--line);border-radius:10px 0 0 10px}
+.scan td:last-child{border-right:1px solid var(--line);border-radius:0 10px 10px 0}
+.scan tr.tap td{cursor:pointer}
+.scan tr.tap:hover td{border-color:var(--cyan);background:#0c1d48}
+.scan tr.good td{border-color:var(--green);background:rgba(57,255,159,.1)}
+.scan tr.bad td{border-color:var(--red);background:rgba(255,77,109,.1)}
+.scan tr.killed td{opacity:.55;text-decoration:line-through}
+.s-open{color:var(--green)}.s-closed{color:#ff7a8f}.s-filtered{color:var(--amber)}
+.scanwrap{overflow-x:auto}
+
+/* boss */
+.boss-hud{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin-bottom:14px}
+.integ{height:14px;border-radius:9px;background:#2a0a14;border:1px solid rgba(255,77,109,.5);overflow:hidden}
+.integ i{display:block;height:100%;background:linear-gradient(90deg,#ff4d6d,#ffc94d,#39ff9f);transition:width .5s}
+.timer{height:5px;background:#1a0b14;border-radius:9px;overflow:hidden;margin:6px 0 16px}
+.timer i{display:block;height:100%;background:var(--red)}
+.alarm{animation:alarm 1s infinite}
+@keyframes alarm{50%{box-shadow:inset 0 0 60px rgba(255,0,60,.25)}}
+
+/* cert */
+.cert{text-align:center;padding:28px 18px;border:2px solid transparent;border-radius:20px;
+  background:linear-gradient(var(--panel),var(--panel)) padding-box,linear-gradient(135deg,var(--cyan),var(--violet),var(--blue)) border-box}
+.rank{font-family:var(--disp);font-weight:900;font-size:clamp(26px,6vw,44px);margin:10px 0 4px}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:18px 0}
+.statgrid div{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px}
+.statgrid b{display:block;font:800 22px var(--mono);color:var(--cyan)}
+.statgrid small{color:var(--dim);font-size:12px}
+
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.t{font:800 14px var(--mono);padding:9px 16px;border-radius:999px;background:#08321f;border:1px solid var(--green);color:var(--green);animation:tin .25s, tout .4s 1.5s forwards}
+.t.warn{background:#3a2a05;border-color:var(--amber);color:var(--amber)}
+.t.bad{background:#3a0613;border-color:var(--red);color:#ff98aa}
+@keyframes tin{from{opacity:0;transform:translateY(10px)}}
+@keyframes tout{to{opacity:0;transform:translateY(-10px)}}
+.confetti{position:fixed;top:-10px;width:8px;height:14px;z-index:55;pointer-events:none;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+@media (max-width:560px){#hud .hide-s{display:none}.card{padding:14px}.tout{font-size:11.5px}.scan{font-size:12px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<header id="hud"></header>
+<main id="app"></main>
+<div id="toast"></div>
+<script>
+/* ============ core ============ */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const app=$('#app');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const S={name:'',xp:0,streak:0,best:0,correct:0,total:0,done:{},muted:false,boss:null};
+const KEY='packet-hunt-v1';
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function load(){try{const d=JSON.parse(localStorage.getItem(KEY)||'null');if(d)Object.assign(S,d)}catch(e){}}
+function view(html){app.innerHTML=html;window.scrollTo({top:0});}
+
+/* sound */
+let AC;
+function beep(f=600,d=.08,type='square',v=.04,delay=0){
+  if(S.muted)return;
+  try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+    const t=AC.currentTime+delay,o=AC.createOscillator(),g=AC.createGain();
+    o.type=type;o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(v,t);
+    g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+d+.02);
+  }catch(e){}
+}
+const sfx={
+  ok(){beep(660,.09,'square',.035);beep(990,.14,'square',.035,.08)},
+  bad(){beep(180,.28,'sawtooth',.04)},
+  tick(){beep(1400,.02,'square',.015)},
+  key(){beep(900+Math.random()*300,.015,'square',.01)},
+  win(){[523,659,784,1046].forEach((f,i)=>beep(f,.18,'triangle',.06,i*.11))},
+  alarm(){beep(440,.15,'sawtooth',.03);beep(330,.15,'sawtooth',.03,.16)}
+};
+
+/* HUD */
+function hud(){
+  const h=$('#hud');
+  if(!S.name){h.innerHTML=`<span class="logo">◢ PACKET HUNT</span><span class="sp"></span><button id="mute" aria-label="Toggle sound">${S.muted?'🔇':'🔊'}</button>`;}
+  else h.innerHTML=`<span class="logo" id="home">◢ PACKET HUNT</span><span class="sp"></span>
+    <span class="pill hide-s">🕵️ ${esc(S.name)}</span>
+    <span class="pill streak">🔥 <b>${S.streak}</b></span>
+    <span class="pill">XP <b id="xpv">${S.xp}</b></span>
+    <button id="mute" aria-label="Toggle sound">${S.muted?'🔇':'🔊'}</button>`;
+  $('#mute').onclick=()=>{S.muted=!S.muted;save();hud()};
+  const hm=$('#home'); if(hm) hm.onclick=()=>{if(!window.__busy)hub()};
+}
+function toast(msg,kind=''){const t=document.createElement('div');t.className='t '+kind;t.textContent=msg;$('#toast').appendChild(t);setTimeout(()=>t.remove(),2000)}
+function gain(n,label){S.xp=Math.max(0,S.xp+n);save();hud();if(label!==false)toast((n>=0?'+':'')+n+' XP'+(label?' · '+label:''),n<0?'warn':'')}
+function answer(ok,base=100){
+  S.total++;
+  if(ok){S.correct++;S.streak++;S.best=Math.max(S.best,S.streak);const b=base+Math.min(S.streak-1,5)*20;sfx.ok();gain(b,S.streak>2?`${S.streak} streak!`:'');return b}
+  S.streak=0;sfx.bad();save();hud();app.classList.remove('shake');void app.offsetWidth;app.classList.add('shake');return 0;
+}
+function confetti(n=70){
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const cols=['#3fd0ff','#39ff9f','#ffc94d','#a98bff','#ff4d6d'];
+  for(let i=0;i<n;i++){const c=document.createElement('div');c.className='confetti';
+    c.style.left=Math.random()*100+'vw';c.style.background=rnd(cols);c.style.animationDuration=(1.8+Math.random()*1.8)+'s';
+    c.style.animationDelay=Math.random()*.4+'s';document.body.appendChild(c);setTimeout(()=>c.remove(),4500)}
+}
+const PRAISE=['Access granted!','Nailed it.','Clean hit!','Correct!','Textbook.','Firewall approved ✔'];
+
+/* ============ background network ============ */
+(function(){
+  const cv=$('#bg'),cx=cv.getContext('2d');let W,H,N=[];
+  const still=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function rs(){W=cv.width=innerWidth*devicePixelRatio;H=cv.height=innerHeight*devicePixelRatio;
+    const n=Math.min(60,Math.floor(innerWidth*innerHeight/22000));
+    N=Array.from({length:n},()=>({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.25*devicePixelRatio,vy:(Math.random()-.5)*.25*devicePixelRatio}))}
+  rs();addEventListener('resize',rs);
+  let pk=[];
+  function fr(){
+    cx.clearRect(0,0,W,H);const D=150*devicePixelRatio;
+    for(const a of N){if(!still){a.x+=a.vx;a.y+=a.vy}if(a.x<0||a.x>W)a.vx*=-1;if(a.y<0||a.y>H)a.vy*=-1}
+    cx.lineWidth=devicePixelRatio*.7;
+    for(let i=0;i<N.length;i++)for(let j=i+1;j<N.length;j++){const a=N[i],b=N[j],d=Math.hypot(a.x-b.x,a.y-b.y);
+      if(d<D){cx.strokeStyle=`rgba(63,150,255,${.16*(1-d/D)})`;cx.beginPath();cx.moveTo(a.x,a.y);cx.lineTo(b.x,b.y);cx.stroke();
+        if(!still&&Math.random()<.0009)pk.push({a,b,t:0})}}
+    cx.fillStyle='rgba(63,208,255,.55)';for(const a of N){cx.beginPath();cx.arc(a.x,a.y,1.6*devicePixelRatio,0,7);cx.fill()}
+    pk=pk.filter(p=>p.t<=1);for(const p of pk){p.t+=.012;const x=p.a.x+(p.b.x-p.a.x)*p.t,y=p.a.y+(p.b.y-p.a.y)*p.t;
+      cx.fillStyle='rgba(57,255,159,.9)';cx.fillRect(x-2*devicePixelRatio,y-2*devicePixelRatio,4*devicePixelRatio,4*devicePixelRatio)}
+    requestAnimationFrame(fr)}
+  fr();
+})();
+
+/* ============ generic quiz ============ */
+function runQuiz({kicker,questions,onDone,intro}){
+  let i=0,correct=0;
+  const qs=questions.map(q=>({...q,order:q.keep?q.opts.map((_,k)=>k):shuffle(q.opts.map((_,k)=>k))}));
+  function show(){
+    const q=qs[i];
+    view(`<section class="screen card">
+      <div class="qtop"><span class="kicker">${kicker}</span><span>${i+1} / ${qs.length}</span></div>
+      <div class="bar"><i style="width:${i/qs.length*100}%"></i></div>
+      ${i===0&&intro?`<p class="dim" style="margin:0 0 14px;line-height:1.5">${intro}</p>`:''}
+      ${q.tag?`<div class="tag">${q.tag}</div>`:''}
+      <h2 class="q">${q.q}</h2>
+      ${q.code?`<pre class="code">${q.code}</pre>`:''}
+      <div class="opts ${q.grid?'grid':''}">${q.order.map(k=>`<button class="opt ${q.mono?'mono':''}" data-k="${k}">${q.icons?`<span class="oi">${q.icons[k]}</span>`:''}<span>${q.opts[k]}</span></button>`).join('')}</div>
+      <div id="fb"></div></section>`);
+    $$('.opt').forEach(b=>b.onclick=()=>pick(+b.dataset.k,b));
+  }
+  function pick(k,btn){
+    const q=qs[i],ok=k===q.a;
+    $$('.opt').forEach(b=>{b.disabled=true;if(+b.dataset.k===q.a)b.classList.add('right')});
+    if(!ok)btn.classList.add('wrong');
+    answer(ok);if(ok)correct++;
+    $('#fb').innerHTML=`<div class="fb ${ok?'ok':'no'}"><b>${ok?rnd(PRAISE):'Not quite.'}</b>${q.why||''}</div>
+      <button class="btn primary" id="nx">${i<qs.length-1?'Next →':'Finish ✔'}</button>`;
+    $('#nx').onclick=()=>{i++;i<qs.length?show():onDone(correct,qs.length)};
+    setTimeout(()=>$('#nx')&&$('#nx').scrollIntoView({behavior:'smooth',block:'nearest'}),50);
+  }
+  show();
+}
+
+/* modal question (used inside sims) */
+function askModal(q){
+  return new Promise(res=>{
+    const order=q.keep?q.opts.map((_,k)=>k):shuffle(q.opts.map((_,k)=>k));
+    const m=document.createElement('div');m.className='modal';
+    m.innerHTML=`<div class="card"><div class="kicker" style="margin-bottom:8px">${q.kicker||'🛰️ Mission Control asks'}</div>
+      <h2 class="q" style="font-size:20px">${q.q}</h2>
+      <div class="opts">${order.map(k=>`<button class="opt ${q.mono?'mono':''}" data-k="${k}">${q.opts[k]}</button>`).join('')}</div><div class="mfb"></div></div>`;
+    document.body.appendChild(m);
+    $$('.opt',m).forEach(b=>b.onclick=()=>{
+      const ok=+b.dataset.k===q.a;
+      $$('.opt',m).forEach(x=>{x.disabled=true;if(+x.dataset.k===q.a)x.classList.add('right')});
+      if(!ok)b.classList.add('wrong');answer(ok);
+      $('.mfb',m).innerHTML=`<div class="fb ${ok?'ok':'no'}"><b>${ok?rnd(PRAISE):'Not quite.'}</b>${q.why||''}</div><button class="btn primary">Continue →</button>`;
+      $('.mfb button',m).onclick=()=>{m.remove();res(ok)};
+    });
+  });
+}
+
+function brief(who,icon,txt,objIdx,objTotal){
+  return `<div class="card brief"><div class="av">${icon}</div><div class="msg"><div class="who">${who}</div>
+    <div class="txt" id="btxt">${txt}</div>
+    ${objTotal?`<div class="objs">${Array.from({length:objTotal},(_,k)=>`<i class="${k<objIdx?'d':k===objIdx?'c':''}"></i>`).join('')}</div>`:''}</div></div>`;
+}
+
+/* ============ screens ============ */
+const MISSIONS=[
+  {id:'m1',icon:'🛡️',title:'Security Bootcamp',desc:'CIA triad, threats vs. vulnerabilities, the hacker toolkit, IPs & ports.',run:()=>mission1()},
+  {id:'m2',icon:'🦈',title:'Packet Detective',desc:'Drive a Wireshark-style capture. Inspect packets, filter traffic and catch an intruder.',run:()=>mission2()},
+  {id:'m3',icon:'💻',title:'Nmap Terminal Ops',desc:'Type real Nmap commands in a lab terminal to map the network.',run:()=>mission3()},
+  {id:'m4',icon:'🔍',title:'Read the Scan',desc:'A company server got scanned. Interpret the results and lock it down.',run:()=>mission4()},
+];
+
+function boot(){
+  hud();
+  view(`<section class="screen boot">
+    <div class="bootlog" id="bl"></div>
+    <div id="bootrest" style="display:none;flex-direction:column;gap:18px">
+      <h1 class="title glow"><span class="sub">SOCIETY OF CYBERSECURITY</span><span class="glitch" data-t="OPERATION: PACKET HUNT">OPERATION: PACKET HUNT</span></h1>
+      <p style="font-size:17px;line-height:1.55;max-width:620px;margin:0">An intruder is loose on the school network. Use <b style="color:var(--cyan)">Wireshark</b> and <b style="color:var(--cyan)">Nmap</b> to track them down. Four missions, one boss fight, and a rank at the end.</p>
+      <div class="card" style="display:flex;flex-direction:column;gap:14px">
+        <label class="kicker" for="cn">Choose your agent codename</label>
+        <div class="field"><input id="cn" maxlength="18" placeholder="e.g. ByteNinja" value="${esc(S.name)}"></div>
+        <label class="pledge"><input type="checkbox" id="pl"> <span>I pledge to be an <b style="color:#fff">ethical hacker</b>: I only scan or test computers I own or have permission to test.</span></label>
+        <button class="btn primary" id="go" disabled>Jack in ⚡</button>
+      </div>
+    </div></section>`);
+  const lines=['> establishing secure uplink ...','> loading toolkit: wireshark ✔  nmap ✔  kali ✔','> anomaly detected on 192.168.1.0/24','> <span class="d">recruiting new SOC analyst...</span>'];
+  const bl=$('#bl');let k=0;
+  (async()=>{for(const l of lines){bl.innerHTML+=l+'<br>';sfx.tick();await sleep(320)}
+    const r=$('#bootrest');if(r){r.style.display='flex';}
+    const cn=$('#cn'),pl=$('#pl'),go=$('#go');
+    const upd=()=>go.disabled=!(cn.value.trim()&&pl.checked);cn.oninput=upd;pl.onchange=upd;upd();
+    cn.onkeydown=e=>{if(e.key==='Enter'&&!go.disabled)go.click()};
+    go.onclick=()=>{S.name=cn.value.trim().slice(0,18);save();sfx.win();hub()};
+  })();
+}
+
+function stars(c,t){const p=c/t;return p>=.9?3:p>=.7?2:1}
+function unlocked(i){return i===0||!!S.done[MISSIONS[i-1].id]}
+
+function hub(){
+  hud();window.__busy=false;
+  const allDone=MISSIONS.every(m=>S.done[m.id]);
+  view(`<section class="screen">
+    <div class="hubhead"><div><div class="kicker">SOC Headquarters</div><h2 class="disp glow" style="font-size:clamp(22px,4.5vw,32px);margin-top:4px">Welcome, Agent ${esc(S.name)}</h2>
+    <p class="dim" style="margin:6px 0 0">Clear each mission to unlock the next. Answer streaks multiply your XP.</p></div>
+    ${S.boss?`<button class="btn sm" id="cert">🏅 My certificate</button>`:''}</div>
+    <div class="missions">
+    ${MISSIONS.map((m,i)=>{const d=S.done[m.id],u=unlocked(i);
+      return `<button class="mcard ${u?'':'locked'}" data-i="${i}">
+        <span class="st">${d?`<span class="stars">${'★'.repeat(stars(d.c,d.t))}${'☆'.repeat(3-stars(d.c,d.t))}</span>`:u?'<span style="color:var(--cyan)">READY</span>':'🔒'}</span>
+        <span class="num">MISSION 0${i+1}</span><span class="ico">${m.icon}</span><h3>${m.title}</h3><p>${m.desc}</p></button>`}).join('')}
+      <button class="mcard boss ${allDone?'':'locked'}" data-boss="1">
+        <span class="st">${S.boss?`<span class="stars">${S.boss.score} pts</span>`:allDone?'<span style="color:var(--red)">ACTIVE</span>':'🔒'}</span>
+        <span class="num" style="color:var(--red)">FINAL MISSION</span><span class="ico">🚨</span><h3>INTRUSION SHOWDOWN</h3>
+        <p>10 rapid-fire questions against the clock. Every miss lets the attacker deeper into the network. Defend it!</p></button>
+    </div>
+    <p style="text-align:center;margin-top:28px"><button class="btn ghost sm" id="reset">↺ Reset progress (new player)</button></p>
+  </section>`);
+  $$('.mcard').forEach(b=>b.onclick=()=>{
+    if(b.classList.contains('locked')){sfx.bad();toast('Locked — finish the previous mission first','bad');return}
+    sfx.tick();if(b.dataset.boss)bossIntro();else MISSIONS[+b.dataset.i].run();
+  });
+  $('#reset').onclick=()=>{resetConfirm()};
+  const c=$('#cert');if(c)c.onclick=certificate;
+}
+function resetConfirm(){
+  const m=document.createElement('div');m.className='modal';
+  m.innerHTML=`<div class="card"><h2 class="q" style="font-size:20px">Wipe all progress and start as a new agent?</h2><div class="row"><button class="btn primary" id="y">Yes, reset</button><button class="btn" id="n">Cancel</button></div></div>`;
+  document.body.appendChild(m);$('#n',m).onclick=()=>m.remove();
+  $('#y',m).onclick=()=>{m.remove();Object.assign(S,{name:'',xp:0,streak:0,best:0,correct:0,total:0,done:{},boss:null});save();boot()};
+}
+
+function missionDone(id,c,t,line){
+  const prev=S.done[id];if(!prev||c>=prev.c)S.done[id]={c,t};save();
+  const st=stars(c,t);sfx.win();confetti();
+  const idx=MISSIONS.findIndex(m=>m.id===id);
+  const next=MISSIONS[idx+1];
+  view(`<section class="screen card" style="text-align:center;padding:34px 20px">
+    <div class="kicker">Mission complete</div>
+    <h2 class="disp glow" style="font-size:clamp(24px,5vw,38px);margin:10px 0">${MISSIONS[idx].title}</h2>
+    <div class="stars" style="font-size:44px">${'★'.repeat(st)}<span style="opacity:.25">${'★'.repeat(3-st)}</span></div>
+    <p style="font-size:17px">${c} / ${t} questions correct</p>
+    <p class="dim" style="max-width:520px;margin:0 auto 20px;line-height:1.55">${line}</p>
+    <div class="row" style="justify-content:center">
+      ${next?`<button class="btn primary" id="nx">Next: ${next.title} →</button>`:`<button class="btn primary" id="nx" style="background:linear-gradient(135deg,#ff2d55,#ff8a3d)">🚨 Start the Showdown</button>`}
+      <button class="btn" id="hq">Back to HQ</button></div></section>`);
+  $('#hq').onclick=hub;$('#nx').onclick=()=>next?next.run():bossIntro();
+}
+
+/* ============ MISSION 1 ============ */
+function mission1(){
+  const CIA=['Confidentiality','Integrity','Availability'],CI=['🔒','🧾','⚡'];
+  const TVDA=['Threat','Vulnerability','Defense','Attack'],TI=['☁️','🕳️','🛡️','💥'];
+  const TOOLS=['Wireshark','Nmap','Kali Linux','Burp Suite','Metasploit','Firewall'],TLI=['🦈','🗺️','🐉','🌐','🎯','🧱'];
+  const Q=[
+    {tag:'CIA Triad',q:'A hacker leaks your private DMs online for everyone to read. Which goal of cybersecurity was broken?',opts:CIA,icons:CI,a:0,grid:1,keep:1,why:'Confidentiality = keeping information private. Private messages became public.'},
+    {tag:'CIA Triad',q:'Someone secretly changes your test score in the school system from 62 to 98.',opts:CIA,icons:CI,a:1,grid:1,keep:1,why:'Integrity = making sure information isn\'t changed without permission. Even a "nice" change breaks it!'},
+    {tag:'CIA Triad',q:'The school portal gets flooded with fake traffic during exam week and nobody can log in.',opts:CIA,icons:CI,a:2,grid:1,keep:1,why:'Availability = systems are accessible when needed. The portal was down when students needed it.'},
+    {tag:'Key concepts',q:'The school server is running old software with a known bug that nobody has fixed.',opts:TVDA,icons:TI,a:1,grid:1,keep:1,why:'A vulnerability is a weakness an attacker could take advantage of.'},
+    {tag:'Key concepts',q:'A hacker actually uses that bug to break into the server.',opts:TVDA,icons:TI,a:3,grid:1,keep:1,why:'An attack is an attempt to exploit a vulnerability.'},
+    {tag:'Key concepts',q:'A hacking group that <i>could</i> target schools in the future.',opts:TVDA,icons:TI,a:0,grid:1,keep:1,why:'A threat is something that could potentially harm a system or its data — it hasn\'t happened yet.'},
+    {tag:'Key concepts',q:'Installing updates, using a firewall, and monitoring the network.',opts:TVDA,icons:TI,a:2,grid:1,keep:1,why:'Defenses are the tools and techniques used to prevent, detect, and respond to attacks.'},
+    {tag:'Toolkit',q:'You want to <b>see the packets</b> travelling through a network, like a microscope.',opts:TOOLS,icons:TLI,a:0,grid:1,keep:1,why:'Wireshark captures and analyzes network traffic.'},
+    {tag:'Toolkit',q:'You want to discover which devices, open ports and services are on a network.',opts:TOOLS,icons:TLI,a:1,grid:1,keep:1,why:'Nmap = Network Mapper. It scans networks to find devices, ports and services.'},
+    {tag:'Toolkit',q:'You need a whole <b>operating system</b> packed with ethical hacking tools.',opts:TOOLS,icons:TLI,a:2,grid:1,keep:1,why:'Kali Linux is an OS full of security-testing tools.'},
+    {tag:'Toolkit',q:'You\'re testing a <b>website or web app</b> for security vulnerabilities.',opts:TOOLS,icons:TLI,a:3,grid:1,keep:1,why:'Burp Suite is built for testing websites and web applications.'},
+    {tag:'Toolkit',q:'You want to block unauthorized connections coming into the network.',opts:TOOLS,icons:TLI,a:5,grid:1,keep:1,why:'Firewalls monitor and filter traffic to block unauthorized connections.'},
+    {tag:'Basics',q:'Which of these is a valid IP address?',opts:['192.168.1.10','192.168.1','300.1.1.1','www.192.com'],a:0,mono:1,why:'An IP address is four numbers (0–255) separated by dots, like 192.168.1.10. 300 is too big, and a website name isn\'t an IP.'},
+    {tag:'Basics',q:'Match the port! <code>Port 80</code> is usually used for…',opts:['HTTP (websites)','File Transfer (FTP)','MySQL database','Email'],a:0,why:'Port 80 = HTTP, port 21 = File Transfer, port 3306 = MySQL.'},
+    {tag:'Basics',q:'And <code>port 3306</code> is…',opts:['MySQL database','HTTP (websites)','File Transfer (FTP)','Printer'],a:0,why:'3306 is the default MySQL database port.'},
+    {tag:'Basics',q:'Sending network requests to find active devices, open ports and available services is called…',opts:['Network scanning','Phishing','Encryption','Packet loss'],a:0,why:'That\'s network scanning — exactly what Nmap does.'},
+  ];
+  runQuiz({kicker:'Mission 01 · Security Bootcamp',questions:Q,
+    intro:'Warm-up time, agent. Show Mission Control you know the basics from the briefing.',
+    onDone:(c,t)=>missionDone('m1',c,t,'You know the CIA triad, the difference between a threat and a vulnerability, and your toolkit. Time to watch some real(ish) traffic…')});
+}
+
+/* ============ MISSION 2: WIRESHARK ============ */
+const ME='192.168.1.10',RT='192.168.1.1',SRV='192.168.1.20',DNSS='8.8.8.8',WEB='93.184.215.14',MAIL='142.250.74.37',BAD='192.168.1.66';
+function buildPackets(){
+  const L=[];let t=0;
+  const add=(src,dst,proto,len,info,x={})=>{t+=x.dt??(.002+Math.random()*.06);L.push({no:L.length+1,time:t.toFixed(6),src,dst,proto,len,info,...x})};
+  add('TP-Link_3a:9f:21','Broadcast','ARP',42,'Who has 192.168.1.10? Tell 192.168.1.1',{layers:['arp']});
+  add('Dell_7a:10:0e','TP-Link_3a:9f:21','ARP',42,'192.168.1.10 is at 3c:22:fb:7a:10:0e',{layers:['arp']});
+  add(ME,DNSS,'DNS',74,'Standard query 0x1a2b A www.example.com',{sp:53211,dp:53,layers:['ip','udp','dns']});
+  add(DNSS,ME,'DNS',90,'Standard query response 0x1a2b A www.example.com A 93.184.215.14',{sp:53,dp:53211,layers:['ip','udp','dns']});
+  add(ME,WEB,'TCP',66,'51522 → 80 [SYN] Seq=0 Win=64240',{sp:51522,dp:80,fl:'SYN',layers:['ip','tcp']});
+  add(WEB,ME,'TCP',66,'80 → 51522 [SYN, ACK] Seq=0 Ack=1',{sp:80,dp:51522,fl:'SYN, ACK',layers:['ip','tcp']});
+  add(ME,WEB,'TCP',54,'51522 → 80 [ACK] Seq=1 Ack=1',{sp:51522,dp:80,fl:'ACK',layers:['ip','tcp']});
+  add(ME,WEB,'HTTP',412,'GET / HTTP/1.1',{sp:51522,dp:80,fl:'PSH, ACK',layers:['ip','tcp','http'],app:'GET / HTTP/1.1\\r\\nHost: www.example.com\\r\\nUser-Agent: Mozilla/5.0'});
+  add(WEB,ME,'HTTP',1256,'HTTP/1.1 200 OK  (text/html)',{sp:80,dp:51522,fl:'PSH, ACK',layers:['ip','tcp','http'],app:'HTTP/1.1 200 OK\\r\\nContent-Type: text/html'});
+  add(ME,WEB,'HTTP',398,'GET /logo.png HTTP/1.1',{sp:51522,dp:80,fl:'PSH, ACK',layers:['ip','tcp','http'],app:'GET /logo.png HTTP/1.1\\r\\nHost: www.example.com'});
+  add(WEB,ME,'HTTP',1514,'HTTP/1.1 200 OK  (PNG)',{sp:80,dp:51522,fl:'PSH, ACK',layers:['ip','tcp','http'],app:'HTTP/1.1 200 OK\\r\\nContent-Type: image/png',big:1});
+  add(ME,WEB,'TCP',54,'51522 → 80 [ACK] Seq=703 Ack=2661',{sp:51522,dp:80,fl:'ACK',layers:['ip','tcp']});
+  add(ME,DNSS,'DNS',78,'Standard query 0x3c4d A mail.school.edu',{sp:50110,dp:53,layers:['ip','udp','dns']});
+  add(DNSS,ME,'DNS',94,'Standard query response 0x3c4d A mail.school.edu A 142.250.74.37',{sp:53,dp:50110,layers:['ip','udp','dns']});
+  add(ME,MAIL,'TLSv1.3',571,'Client Hello',{sp:51530,dp:443,fl:'PSH, ACK',layers:['ip','tcp','tls']});
+  add(MAIL,ME,'TLSv1.3',1388,'Server Hello, Change Cipher Spec, Application Data',{sp:443,dp:51530,fl:'PSH, ACK',layers:['ip','tcp','tls']});
+  add(ME,MAIL,'TLSv1.3',290,'Application Data',{sp:51530,dp:443,fl:'PSH, ACK',layers:['ip','tcp','tls']});
+  add(ME,SRV,'HTTP',389,'GET /timetable HTTP/1.1',{sp:51544,dp:80,fl:'PSH, ACK',layers:['ip','tcp','http'],app:'GET /timetable HTTP/1.1\\r\\nHost: portal.school.lan'});
+  add(SRV,ME,'HTTP',980,'HTTP/1.1 200 OK  (text/html)',{sp:80,dp:51544,fl:'PSH, ACK',layers:['ip','tcp','http'],app:'HTTP/1.1 200 OK\\r\\nContent-Type: text/html'});
+  const ports=[21,22,23,25,53,80,110,139,443,445,3306,3389,5900,8080],openP=[21,22,80,443,3306];
+  ports.forEach((p,k)=>{
+    add(BAD,SRV,'TCP',58,`41337 → ${p} [SYN] Seq=0 Win=1024 Len=0`,{sp:41337,dp:p,fl:'SYN',layers:['ip','tcp'],syn:1,dt:.0004});
+    const o=openP.includes(p);
+    add(SRV,BAD,'TCP',o?58:54,o?`${p} → 41337 [SYN, ACK] Seq=0 Ack=1`:`${p} → 41337 [RST, ACK] Seq=1 Ack=1`,{sp:p,dp:41337,fl:o?'SYN, ACK':'RST, ACK',layers:['ip','tcp'],rst:!o,dt:.0003});
+    if(k===5)add(ME,DNSS,'DNS',80,'Standard query 0x77e1 A classroom.school.edu',{sp:50999,dp:53,layers:['ip','udp','dns']});
+    if(k===10)add(DNSS,ME,'DNS',96,'Standard query response 0x77e1 A classroom.school.edu',{sp:53,dp:50999,layers:['ip','udp','dns']});
+  });
+  add('HP_LaserJet_41:0c',  'Broadcast','ARP',60,'Who has 192.168.1.1? Tell 192.168.1.35',{layers:['arp']});
+  return L;
+}
+function rowClass(p){if(p.rst)return 'p-rst';if(p.syn)return 'p-syn';if(p.layers.includes('http'))return 'p-http';if(p.layers.includes('dns'))return 'p-dns';if(p.layers.includes('arp'))return 'p-arp';if(p.layers.includes('tls'))return 'p-tls';return 'p-tcp'}
+function compileFilter(f){
+  f=f.trim().toLowerCase();if(!f)return ()=>true;
+  const protos=['tcp','udp','http','dns','arp','tls','ip'];
+  if(protos.includes(f))return p=>p.layers.includes(f);
+  let m=f.replace(/\s+/g,'').match(/^ip\.(addr|src|dst)==(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if(m){const ip=m[2];return m[1]==='src'?p=>p.src===ip:m[1]==='dst'?p=>p.dst===ip:p=>p.src===ip||p.dst===ip}
+  m=f.replace(/\s+/g,'').match(/^tcp\.port==(\d+)$/);
+  if(m){const n=+m[1];return p=>p.layers.includes('tcp')&&(p.sp===n||p.dp===n)}
+  return null;
+}
+function hexDump(p){
+  let s='';const seed=(p.src+p.dst+p.info);
+  for(let r=0;r<3;r++){let line=(r*16).toString(16).padStart(4,'0')+'  ',asc='';
+    for(let c=0;c<16;c++){const ch=seed.charCodeAt((r*16+c)%seed.length)^(r*7+c);line+=(ch&255).toString(16).padStart(2,'0')+' ';const a=ch&127;asc+=a>32&&a<127?String.fromCharCode(a):'.'}
+    s+=line+' '+asc+'\n'}
+  return s;
+}
+function detailTree(p){
+  const out=[`<div class="l1">▸ Frame ${p.no}: ${p.len} bytes on wire (${p.len*8} bits), captured on interface wlan0</div>`];
+  if(p.layers.includes('arp')){out.push(`<div class="l1">▸ Ethernet II, Src: ${p.src}, Dst: ${p.dst}</div>`,`<div class="l1">▾ Address Resolution Protocol</div>`,`<div>    ${esc(p.info)}</div>`);return out.join('')}
+  out.push(`<div class="l1">▸ Ethernet II</div>`,`<div class="l1">▾ Internet Protocol Version 4, Src: ${p.src}, Dst: ${p.dst}</div>`,`<div>    Time to Live: ${p.src.startsWith('192.168')?64:118}</div>`);
+  if(p.layers.includes('udp'))out.push(`<div class="l1">▾ User Datagram Protocol, Src Port: ${p.sp}, Dst Port: ${p.dp}</div>`);
+  if(p.layers.includes('tcp'))out.push(`<div class="l1">▾ Transmission Control Protocol, Src Port: ${p.sp}, Dst Port: ${p.dp}</div>`,`<div>    Flags: [${p.fl}]</div>`);
+  if(p.layers.includes('dns'))out.push(`<div class="l1">▾ Domain Name System</div>`,`<div>    ${esc(p.info)}</div>`);
+  if(p.layers.includes('http'))out.push(`<div class="l1">▾ Hypertext Transfer Protocol</div>`,...p.app.split('\\r\\n').map(x=>`<div>    ${esc(x)}\\r\\n</div>`));
+  if(p.layers.includes('tls'))out.push(`<div class="l1">▾ Transport Layer Security</div>`,`<div>    ${esc(p.info)} (encrypted 🔒)</div>`);
+  return out.join('');
+}
+
+function mission2(){
+  window.__busy=true;
+  const PK=buildPackets();const LARGEST=PK.find(p=>p.big).no;
+  let shown=[],captured=0,sel=null,filter=()=>true,filterText='',capturing=false,step=0,c=0,t=0;
+  const OBJ=[
+    {txt:'Welcome to the packet lab. Press the blue <b>shark fin</b> 🦈 in the toolbar to start capturing traffic.',ev:'start'},
+    {txt:'Packets are flowing! <b>Tap any packet</b> in the list to inspect it. The details pane shows its Source, Destination, Protocol and Length.',ev:'select',ok:()=>true},
+    {txt:'Too much noise. Use the <b>display filter</b>: type <code>http</code> and press <b>Apply</b> to show only web traffic.',ev:'filter',ok:f=>f==='http'},
+    {txt:'Now find the <b>biggest</b> HTTP packet — check the <b>Length</b> column — and tap it.',ev:'select',ok:p=>p.no===LARGEST},
+    {txt:'Clear the filter (empty the box + Apply) and scroll down. One device is firing <b>lots of tiny packets</b> at the school server <code>192.168.1.20</code>, each to a different port. Tap one of the packets it <b>sent</b>.',ev:'select',ok:p=>p.src===BAD},
+    {txt:'Isolate the suspect! Filter so you only see that device. Type <code>ip.addr==</code> followed by its IP address, then Apply.',ev:'filter',ok:f=>f.replace(/\s/g,'')===`ip.addr==${BAD}`||f.replace(/\s/g,'')===`ip.src==${BAD}`},
+  ];
+  view(`<section class="screen">
+    <div id="brief"></div>
+    <div class="ws">
+      <div class="ws-title"><svg class="fin" viewBox="0 0 24 24"><path d="M3 20c4-1 7-6 8-16 3 5 6 11 10 16z" fill="#3f8cff"/></svg> Capturing from wlan0 — school-lab</div>
+      <div class="ws-tool">
+        <button class="tbtn pulse" id="start" title="Start capture"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M3 20c4-1 7-6 8-16 3 5 6 11 10 16z" fill="#3f8cff"/></svg></button>
+        <button class="tbtn" id="stop" title="Stop" disabled><svg width="16" height="16"><rect width="16" height="16" rx="2" fill="#ff4d6d"/></svg></button>
+        <form class="filt" id="ff"><input id="fi" placeholder="Apply a display filter … (e.g. http, dns, ip.addr==…)" autocomplete="off" autocapitalize="off" spellcheck="false"><button>Apply</button></form>
+      </div>
+      <div class="plist" id="pl"><div class="empty">No packets yet. Start a capture to see live traffic.</div></div>
+      <div class="details" id="dt"><span class="dim">Select a packet to see its details.</span></div>
+    </div>
+    <div class="row" style="margin-top:12px;justify-content:space-between"><span class="dim mono" id="stat" style="font-size:12px">Packets: 0 · Displayed: 0</span><button class="btn sm ghost" id="quit">Exit to HQ</button></div>
+  </section>`);
+  $('#quit').onclick=()=>{capturing=false;hub()};
+  const setBrief=()=>{$('#brief').innerHTML=brief('MISSION CONTROL','🦈',OBJ[step]?.txt||'Nice work.',step,OBJ.length)};
+  setBrief();
+  function render(keepScroll=true){
+    const pl=$('#pl');if(!captured){return}
+    const vis=PK.slice(0,captured).filter(filter);
+    const atBottom=pl.scrollTop+pl.clientHeight>=pl.scrollHeight-30;
+    pl.innerHTML=vis.length?`<table class="pk"><thead><tr><th>No.</th><th>Time</th><th>Source</th><th>Destination</th><th>Protocol</th><th>Length</th><th>Info</th></tr></thead><tbody>${
+      vis.map(p=>`<tr class="${rowClass(p)} ${sel===p.no?'sel':''}" data-n="${p.no}"><td>${p.no}</td><td>${p.time}</td><td>${p.src}</td><td>${p.dst}</td><td>${p.proto}</td><td>${p.len}</td><td class="info">${esc(p.info)}</td></tr>`).join('')}</tbody></table>`
+      :`<div class="empty">No packets match this filter.</div>`;
+    if(capturing&&atBottom)pl.scrollTop=pl.scrollHeight;
+    $('#stat').textContent=`Packets: ${captured} · Displayed: ${vis.length}`;
+    $$('tr[data-n]',pl).forEach(tr=>tr.onclick=()=>selectP(+tr.dataset.n));
+  }
+  function selectP(n){
+    sel=n;const p=PK[n-1];sfx.tick();
+    $$('#pl tr.sel').forEach(x=>x.classList.remove('sel'));const tr=$(`#pl tr[data-n="${n}"]`);if(tr)tr.classList.add('sel');
+    $('#dt').innerHTML=`<div class="sumchips"><div><small>Source</small><b>${p.src}</b></div><div><small>Destination</small><b>${p.dst}</b></div><div><small>Protocol</small><b>${p.proto}</b></div><div><small>Length</small><b>${p.len} bytes</b></div></div>
+      <div class="tree">${detailTree(p)}</div><div class="hex">${esc(hexDump(p))}</div>`;
+    ev('select',p);
+  }
+  async function ev(type,arg){
+    const o=OBJ[step];if(!o||o.ev!==type)return;
+    if(o.ok&&!o.ok(arg)){if(type==='select'&&step===3){toast('Not the biggest one — compare the Length column','warn')}
+      if(type==='select'&&step===4){toast(arg.src===SRV?'That one was sent BY the server. Find what the suspect sent.':'Look for many tiny TCP [SYN] packets to different ports','warn')}
+      return}
+    step++;gain(50,'objective');
+    if(step===2){ // after first select: ask about destination
+      const p=arg;const others=shuffle([ME,RT,SRV,DNSS,WEB,MAIL,BAD,'Broadcast','TP-Link_3a:9f:21'].filter(x=>x!==p.dst)).slice(0,3);
+      t++;if(await askModal({q:`Look at the details pane for packet #${p.no}. Where is it going — what's its <b>Destination</b>?`,opts:[p.dst,...others],a:0,mono:1,why:'Destination = where the data is going. Source = where it came from.'}))c++;
+    }
+    if(step===4){t++;if(await askModal({q:`Packet #${LARGEST} is ${PK[LARGEST-1].len} bytes. What is it carrying?`,opts:['An image (PNG) from a website','A DNS lookup','A password reset','Nothing — it\'s empty'],a:0,why:'The Info column says "200 OK (PNG)" — the web server sent a picture. Images are big, so the packet is big.'}))c++;}
+    if(step===5){
+      t++;if(await askModal({q:'What is the <b>IP address</b> of the suspicious device?',opts:[BAD,SRV,ME,RT],a:0,mono:1,why:`${BAD} is the Source of all those [SYN] packets. The server (${SRV}) is the victim.`}))c++;
+      t++;if(await askModal({q:'It\'s knocking on port 21, 22, 23, 25, 53, 80… one after another. What is it most likely doing?',opts:['Scanning for open ports — mapping the server','Streaming a video','Printing homework','Checking the time'],a:0,why:'Sending requests to many ports to see which ones answer is network scanning — exactly what Nmap does. Servers reply [SYN, ACK] for open ports and [RST] (red rows) for closed ones.'}))c++;
+    }
+    if(step>=OBJ.length){
+      const fin=[
+        {q:'Wireshark captures small pieces of network data called…',opts:['Packets','Pixels','Cookies','Bytecodes'],a:0,why:'Packets! Wireshark lets us capture and inspect them one by one.'},
+        {q:'Which of these is NOT something cybersecurity pros use Wireshark for?',opts:['Making the Wi-Fi faster','Detecting suspicious traffic','Troubleshooting network problems','Seeing which devices are communicating'],a:0,why:'Wireshark watches and analyzes traffic — it doesn\'t speed anything up.'},
+      ];
+      for(const q of fin){t++;if(await askModal({...q,kicker:'🧠 Debrief'}))c++}
+      capturing=false;window.__busy=false;
+      missionDone('m2',c,t,`You caught ${BAD} scanning the school server's ports. Wireshark showed you <i>what</i> happened — now learn to use the same scanning tool the intruder used: Nmap.`);
+      return;
+    }
+    setBrief();
+  }
+  $('#start').onclick=async()=>{
+    if(capturing||captured)return;capturing=true;sfx.ok();
+    $('#start').classList.remove('pulse');$('#start').disabled=true;$('#stop').disabled=false;
+    ev('start');
+    while(capturing&&captured<PK.length){captured++;render();const last=$('#pl tbody tr:last-child');if(last)last.classList.add('new');await sleep(captured>19&&captured<50?55:140)}
+    capturing=false;$('#stop').disabled=true;render();
+  };
+  $('#stop').onclick=()=>{capturing=false;captured=PK.length;$('#stop').disabled=true;render()};
+  $('#ff').onsubmit=e=>{
+    e.preventDefault();const v=$('#fi').value;const f=compileFilter(v);const fi=$('#fi');
+    fi.classList.remove('okf','badf');
+    if(!f){fi.classList.add('badf');sfx.bad();toast('Invalid filter — try http, dns, tcp, arp or ip.addr==x.x.x.x','bad');return}
+    if(v.trim())fi.classList.add('okf');
+    if(!captured){toast('Start a capture first!','warn');return}
+    filter=f;filterText=v.trim().toLowerCase();render();ev('filter',filterText);
+  };
+  $('#fi').oninput=()=>{const fi=$('#fi');fi.classList.remove('okf','badf');if(fi.value.trim())fi.classList.add(compileFilter(fi.value)?'okf':'badf')};
+}
+
+/* ============ MISSION 3: NMAP TERMINAL ============ */
+const HOSTS={
+  '127.0.0.1':{name:'localhost',lat:'0.000052',os:'Linux 5.15 - 6.8',ports:[[22,'ssh','OpenSSH 8.9p1 Ubuntu 3ubuntu0.10'],[80,'http','Apache httpd 2.4.52 ((Ubuntu))'],[443,'https','Apache httpd 2.4.52'],[631,'ipp','CUPS 2.4'],[3306,'mysql','MySQL 8.0.36'],[8080,'http-proxy','Jetty 9.4.53']],title:'Apache2 Ubuntu Default Page'},
+  '192.168.1.1':{name:'router.lan',lat:'0.0021',os:'Linux 4.x (embedded)',mac:'A4:2B:B0:3A:9F:21 (TP-Link)',ports:[[53,'domain','dnsmasq 2.89'],[80,'http','lighttpd 1.4.59'],[443,'https','lighttpd 1.4.59']],title:'Router Login'},
+  '192.168.1.10':{name:'student-laptop.lan',lat:'0.000041',os:'Linux 5.15 - 6.8',ports:null},
+  '192.168.1.20':{name:'portal.school.lan',lat:'0.0034',os:'Linux 5.x',mac:'00:1A:4B:22:7C:10 (HPE)',ports:[[21,'ftp','vsftpd 3.0.5'],[22,'ssh','OpenSSH 9.2p1 Debian'],[80,'http','nginx 1.24.0'],[443,'https','nginx 1.24.0'],[3306,'mysql','MySQL 8.0.36']],title:'School Portal'},
+  '192.168.1.35':{name:'printer-lab2.lan',lat:'0.0048',os:'HP embedded',mac:'9C:8E:99:41:0C:5A (Hewlett Packard)',ports:[[80,'http','HP-ChaiSOE 1.0'],[515,'printer',''],[631,'ipp','HP IPP'],[9100,'jetdirect','']],title:'HP LaserJet'},
+  '192.168.1.66':{name:'kali-intruder.lan',lat:'0.0019',os:'Linux 6.x (Kali Linux rolling)',mac:'08:00:27:6E:13:37 (Oracle VirtualBox)',ports:[[22,'ssh','OpenSSH 9.6p1 Debian 5 (protocol 2.0)'],[4444,'krb524?','']],title:null,host:'kali-intruder'},
+};
+HOSTS['192.168.1.10'].ports=HOSTS['127.0.0.1'].ports;HOSTS['192.168.1.10'].title=HOSTS['127.0.0.1'].title;
+const UP=['192.168.1.1','192.168.1.10','192.168.1.20','192.168.1.35','192.168.1.66'];
+function parsePorts(spec){
+  const set=new Set();if(!spec)return null;
+  for(const part of spec.split(',')){
+    const m=part.match(/^(\d+)(?:-(\d+))?$/);if(!m)return 'bad';
+    const a=+m[1],b=m[2]?+m[2]:a;if(a<1||b>65535||b<a)return 'bad';
+    if(b-a>70000)return 'bad';for(let i=a;i<=b;i++)set.add(i);
+  }
+  return set;
+}
+function parseNmap(line){
+  const tk=line.trim().split(/\s+/);
+  const o={flags:new Set(),portSpec:null,targets:[],version:false};
+  for(let i=1;i<tk.length;i++){
+    const x=tk[i];
+    if(x==='--version'||x==='-V'){o.version=true}
+    else if(x==='-p'){o.portSpec=tk[++i];if(!o.portSpec)return{err:'-p needs a list of ports, like -p 80,443 or -p 1-1000'}}
+    else if(/^-p[\d,-]+$/.test(x)){o.portSpec=x.slice(2)}
+    else if(['-sV','-O','-sn','-A'].includes(x))o.flags.add(x);
+    else if(x.startsWith('-')){
+      const fix={'-sv':'-sV','-SV':'-sV','-o':'-O','-SN':'-sn','-Sn':'-sn','-a':'-A','-version':'--version','--v':'--version','—version':'--version','-P':'-p'}[x];
+      return{err:`Unrecognized option: ${x}`,hint:fix?`Flags are case-sensitive! Did you mean ${fix} ?`:'Type "help" to see the options you learned.'}}
+    else o.targets.push(x);
+  }
+  if(o.portSpec){o.ports=parsePorts(o.portSpec);if(o.ports==='bad')return{err:`Invalid port spec: ${o.portSpec}`,hint:'Use a range like 1-1000 or a list like 80,443'}}
+  return o;
+}
+function classifyTarget(t){
+  if(t==='localhost'||t==='127.0.0.1')return{kind:'host',ip:'127.0.0.1',label:'localhost (127.0.0.1)'};
+  if(t==='192.168.1.0/24')return{kind:'net'};
+  const m=t.match(/^192\.168\.1\.(\d{1,3})$/);if(m&&+m[1]<=255)return{kind:'host',ip:t,label:HOSTS[t]?`${HOSTS[t].name} (${t})`:t};
+  return{kind:'forbidden'};
+}
+const pad=(s,n)=>String(s).padEnd(n);
+function nmapOutput(o,tgt){
+  const L=[];const now=new Date();
+  const stamp=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  L.push(['inf',`Starting Nmap 7.95 ( https://nmap.org ) at ${stamp}`]);
+  const ver=o.flags.has('-sV')||o.flags.has('-A'),os=o.flags.has('-O')||o.flags.has('-A');
+  const hostsToScan=tgt.kind==='net'?UP:[tgt.ip];
+  if(o.flags.has('-sn')){
+    hostsToScan.forEach(ip=>{const h=HOSTS[ip];
+      if(!h){L.push(['',`Note: Host seems down.`]);return}
+      L.push(['',`Nmap scan report for ${h.name} (${ip})`],['ok',`Host is up (${h.lat}s latency).`]);if(h.mac)L.push(['',`MAC Address: ${h.mac}`])});
+    const n=tgt.kind==='net'?256:1,up=hostsToScan.filter(ip=>HOSTS[ip]).length;
+    L.push(['',`Nmap done: ${n} IP address${n>1?'es':''} (${up} host${up!==1?'s':''} up) scanned in ${(tgt.kind==='net'?2.31:0.04)} seconds`]);return L;
+  }
+  let upc=0;
+  for(const ip of hostsToScan){
+    const h=HOSTS[ip];
+    if(!h){L.push(['warn',`Note: Host seems down. If it is really up, but blocking our ping probes, try -Pn`]);continue}
+    upc++;
+    L.push(['',`Nmap scan report for ${h.name==='localhost'?'localhost':h.name} (${ip})`],['ok',`Host is up (${h.lat}s latency).`]);
+    const req=o.ports||null; const total=req?req.size:1000;
+    const open=h.ports.filter(([p])=>req?req.has(p):true);
+    const small=req&&req.size<=10;
+    const rows=[];
+    if(small){[...req].sort((a,b)=>a-b).forEach(p=>{const f=h.ports.find(x=>x[0]===p);rows.push(f?['open',...f]:['closed',p,{21:'ftp',22:'ssh',23:'telnet',25:'smtp',53:'domain',80:'http',110:'pop3',443:'https',3306:'mysql',8080:'http-proxy'}[p]||'unknown',''])})}
+    else open.forEach(f=>rows.push(['open',...f]));
+    const notShown=total-rows.length;
+    if(notShown>0)L.push(['',`Not shown: ${notShown} closed tcp ports (reset)`]);
+    if(rows.length){
+      L.push(['',`PORT     STATE  SERVICE    ${ver?'VERSION':''}`]);
+      rows.forEach(([st,p,svc,v])=>{L.push([st,`${pad(p+'/tcp',9)}${pad(st,7)}${pad(svc,11)}${ver?v:''}`]);
+        if(o.flags.has('-A')&&st==='open'&&/http/.test(svc)&&h.title)L.push(['',`|_http-title: ${h.title}`]);
+        if(o.flags.has('-A')&&p===22)L.push(['',`| ssh-hostkey: \n|   256 b3:1f:9a:...:42 (ED25519)`]);});
+    } else L.push(['',`All ${total} scanned ports on ${h.name} (${ip}) are in ignored states.`]);
+    if(h.mac)L.push(['',`MAC Address: ${h.mac}`]);
+    if(os){L.push(['',`Device type: general purpose`],['inf',`OS details: ${h.os}`],['',`Network Distance: ${ip==='127.0.0.1'||ip==='192.168.1.10'?0:1} hops`])}
+    if(o.flags.has('-A')&&h.host)L.push(['warn',`Service Info: Host: ${h.host}; OS: Linux`]);
+    if(ver||os)L.push(['',`\nService detection performed. Please report any incorrect results at https://nmap.org/submit/ .`]);
+  }
+  const n=hostsToScan.length;
+  L.push(['',`Nmap done: ${tgt.kind==='net'?256:n} IP address${n>1||tgt.kind==='net'?'es':''} (${upc} host${upc!==1?'s':''} up) scanned in ${(0.12+(ver?6.4:0)+(os?1.9:0)+(tgt.kind==='net'?11:0)).toFixed(2)} seconds`]);
+  return L;
+}
+
+function mission3(){
+  window.__busy=true;
+  const isLocal=g=>g&&g.kind==='host'&&g.ip==='127.0.0.1';
+  const OBJ=[
+    {txt:'Step 1: Before anything else, check that Nmap is installed by displaying its <b>version</b>.',ok:(o)=>o.version,h1:'There\'s a flag that starts with two dashes and literally says "version".',h2:'nmap --version'},
+    {txt:'Step 2: Run a basic scan of <b>your own computer</b> (localhost). No extra flags.',ok:(o,g)=>isLocal(g)&&!o.portSpec&&!o.flags.size,h1:'Localhost — your own computer — has the IP address 127.0.0.1',h2:'nmap 127.0.0.1'},
+    {txt:'Step 3: Scan only <b>ports 1 through 1000</b> on localhost.',ok:(o,g)=>isLocal(g)&&o.portSpec==='1-1000'&&!o.flags.size,h1:'-p lets you choose which ports. A range uses a dash: start-end.',h2:'nmap -p 1-1000 127.0.0.1'},
+    {txt:'Step 4: Identify which <b>services and versions</b> are running on localhost\'s open ports.',ok:(o,g)=>isLocal(g)&&o.flags.has('-sV'),h1:'s = scan, V = Version. The V is a CAPITAL letter.',h2:'nmap -sV 127.0.0.1'},
+    {txt:'Step 5: Try to detect localhost\'s <b>operating system</b>.',ok:(o,g)=>isLocal(g)&&o.flags.has('-O'),h1:'It\'s a single capital letter — O for Operating system.',h2:'nmap -O 127.0.0.1'},
+    {txt:'Step 6: Discover which devices are <b>alive</b> on the whole lab network <code>192.168.1.0/24</code> — <b>without</b> a port scan.',ok:(o,g)=>g&&g.kind==='net'&&o.flags.has('-sn'),h1:'-sn = "scan, no ports". The /24 means every address from 192.168.1.0 to 192.168.1.255.',h2:'nmap -sn 192.168.1.0/24'},
+    {txt:'Step 7: Scan <b>just the web ports 80 and 443</b> on localhost.',ok:(o,g)=>isLocal(g)&&o.ports instanceof Set&&o.ports.size===2&&o.ports.has(80)&&o.ports.has(443),h1:'-p again, but this time a list separated by a comma (no spaces).',h2:'nmap -p 80,443 127.0.0.1'},
+    {txt:'Final step: Remember <code>192.168.1.66</code> from Wireshark? It\'s on <i>our</i> lab network, so we\'re allowed to investigate. Hit it with <b>several advanced detection features at once</b>.',ok:(o,g)=>g&&g.ip==='192.168.1.66'&&o.flags.has('-A'),h1:'One flag turns on OS detection, version detection, scripts and more. A for "Aggressive"/"All".',h2:'nmap -A 192.168.1.66'},
+  ];
+  let step=0,hints=0,hist=[],hi=0,busy=false,c=0,t=0;
+  view(`<section class="screen">
+    <div id="brief"></div>
+    <div class="term">
+      <div class="tbar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i>&nbsp; student@soc-lab: ~</div>
+      <div class="tout" id="to"></div>
+      <form class="tin" id="tf"><span class="ps">student@soc-lab:~$</span><input id="ti" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="type a command…" enterkeyhint="go"><button>RUN ⏎</button></form>
+    </div>
+    <div class="chips" id="chips">${['nmap','--version','-p','1-1000','80,443','-sV','-O','-sn','-A','127.0.0.1','192.168.1.0/24','192.168.1.66'].map(x=>`<button class="chip" data-v="${x}">${x}</button>`).join('')}<button class="chip x" data-v="⌫">⌫ word</button></div>
+    <div class="row" style="margin-top:12px;justify-content:space-between"><div class="row"><button class="btn sm" id="hint">💡 Hint (−25 XP)</button><span class="dim" style="font-size:13px">Type <code>help</code> for a cheat sheet</span></div><button class="btn sm ghost" id="quit">Exit to HQ</button></div>
+  </section>`);
+  const to=$('#to'),ti=$('#ti');
+  const setBrief=()=>{$('#brief').innerHTML=brief('MISSION CONTROL','💻',OBJ[step]?.txt||'',step,OBJ.length)};
+  setBrief();
+  $('#quit').onclick=hub;
+  function out(cls,txt){const d=document.createElement('div');if(cls)d.className=cls;d.textContent=txt;to.appendChild(d);to.scrollTop=to.scrollHeight}
+  async function stream(lines){for(const [cls,l] of lines){out(cls,l);await sleep(l.startsWith('Nmap done')?0:35)}}
+  out('inf','SOC lab terminal v2.6 — all scans stay inside the lab network.');
+  out('','Your machine: 127.0.0.1 (localhost)   Lab network: 192.168.1.0/24');
+  out('','');
+  $$('#chips .chip').forEach(b=>b.onclick=()=>{sfx.key();
+    if(b.dataset.v==='⌫'){ti.value=ti.value.trimEnd().split(/\s+/).slice(0,-1).join(' ');ti.value+=ti.value?' ':''}
+    else ti.value=(ti.value&&!ti.value.endsWith(' ')?ti.value+' ':ti.value)+b.dataset.v+' ';
+    ti.focus({preventScroll:true})});
+  ti.onkeydown=e=>{
+    if(e.key==='ArrowUp'&&hist.length){hi=Math.max(0,hi-1);ti.value=hist[hi];e.preventDefault()}
+    else if(e.key==='ArrowDown'&&hist.length){hi=Math.min(hist.length,hi+1);ti.value=hist[hi]||''}
+    else if(e.key.length===1)sfx.key();
+  };
+  $('#hint').onclick=()=>{
+    const o=OBJ[step];if(!o)return;hints++;gain(-25,'hint');
+    if(!o._h){o._h=1;out('warn',`💡 HINT: ${o.h1}`)}else{out('warn',`💡 ANSWER: ${o.h2}`)}
+  };
+  $('#tf').onsubmit=async e=>{
+    e.preventDefault();if(busy)return;
+    const line=ti.value.trim();ti.value='';if(!line)return;
+    hist.push(line);hi=hist.length;
+    const ps=document.createElement('div');ps.innerHTML=`<span class="ps">student@soc-lab:~$</span> <span class="cmd">${esc(line)}</span>`;to.appendChild(ps);
+    const first=line.split(/\s+/)[0].toLowerCase();
+    if(first==='clear'){to.innerHTML='';return}
+    if(first==='help'){
+      ['Commands from the briefing:','  nmap --version              show installed version','  nmap <target>                basic scan','  nmap -p <ports> <target>     scan specific ports (1-1000 or 80,443)','  nmap -sV <target>            identify service versions','  nmap -O <target>             detect operating system','  nmap -sn <network>           find live hosts, no port scan','  nmap -A <target>             several advanced detection features','Targets you are allowed to scan: 127.0.0.1 (localhost), 192.168.1.0/24 (lab)'].forEach(x=>out('inf',x));return}
+    if(first==='whoami'){out('',S.name.toLowerCase().replace(/\s+/g,'_')+'  (SOC trainee)');return}
+    if(first==='sudo'){out('err',`${S.name} is not in the sudoers file. This incident will be reported. 😉`);return}
+    if(first==='ls'){out('','notes.txt   pledge.txt   wireshark-capture.pcap');return}
+    if(first==='cat'){out('','"Only scan what you own or have permission to test." — pledge.txt');return}
+    if(first!=='nmap'){out('err',`${first}: command not found`);sfx.bad();return}
+    const o=parseNmap(line);
+    if(o.err){out('err',o.err);if(o.hint)out('warn',o.hint);sfx.bad();return}
+    if(!o.version&&!o.targets.length){out('','Nmap 7.95 ( https://nmap.org )\nUsage: nmap [Scan Type(s)] [Options] {target specification}');out('warn','You need a target! e.g. 127.0.0.1');return}
+    let g=null;
+    if(o.version&&!o.targets.length){busy=true;await stream([['','Nmap version 7.95 ( https://nmap.org )'],['','Platform: x86_64-pc-linux-gnu'],['','Compiled with: liblua-5.4.6 openssl-3.0.13 libssh2-1.11.0 libz-1.3 libpcre2-10.42 libpcap-1.10.4'],['','Available nsock engines: epoll poll select']]);busy=false}
+    else{
+      g=classifyTarget(o.targets[0]);
+      if(g.kind==='forbidden'){
+        out('err',`🚫 MISSION CONTROL BLOCKED THIS SCAN: ${o.targets[0]} is not in your lab.`);
+        out('warn','Scanning networks or devices you don\'t own or have permission to test can be illegal. Stick to 127.0.0.1 or 192.168.1.0/24.');
+        sfx.alarm();return}
+      busy=true;ti.disabled=true;
+      await stream(nmapOutput(o,g));
+      busy=false;ti.disabled=false;
+    }
+    const obj=OBJ[step];
+    if(obj&&obj.ok(o,g)){
+      step++;out('ok',`✔ Objective complete.`);answer(true,obj._h?40:100);c++;t++;
+      if(step===6){await sleep(400);t++;if(await askModal({q:'Your -sn scan found 5 hosts up. Which one have we NOT identified as a normal school device?',opts:['192.168.1.66 (kali-intruder? unknown device)','192.168.1.1 (router)','192.168.1.35 (printer)','192.168.1.20 (school portal)'],a:0,mono:1,why:'The router, printer and portal are all expected. .66 is the same device we caught scanning in Wireshark!'}))c++}
+      if(step>=OBJ.length){
+        await sleep(500);
+        const fin=[
+          {q:'The scan revealed hostname <code>kali-intruder</code> running Linux. Which OS from the briefing is "packed with tools for ethical hacking and security testing"?',opts:['Kali Linux','Windows 11','macOS','Android'],a:0,why:'Kali Linux! The intruder brought a hacker toolkit. Time to report it to the IT security team.'},
+          {q:'Nmap can label a port as open, closed or ___?',opts:['filtered','frozen','hidden','encrypted'],a:0,why:'Open, closed and filtered. Filtered means something like a firewall is blocking Nmap\'s probes, so it can\'t tell.'},
+          {q:'Before you scan any computer with Nmap, you must…',opts:['Own it, or have permission to test it','Turn off your Wi-Fi','Be on the same Wi-Fi as it','Install Wireshark first'],a:0,why:'Ethical hackers only scan systems they own or are allowed to test — like localhost or a lab machine you control.'},
+        ];
+        for(const q of fin){t++;if(await askModal({...q,kicker:'🧠 Debrief'}))c++}
+        window.__busy=false;
+        missionDone('m3',c,t,'You can now drive Nmap like a pro: version checks, port ranges, service and OS detection, host discovery and aggressive scans. Last skill: reading the results.');
+        return;
+      }
+      setBrief();
+    } else if(obj){
+      out('dim','');out('warn','ℹ Valid scan — but not quite what Mission Control asked for. Re-read the objective (or grab a hint).');t+=0;
+    }
+  };
+  setTimeout(()=>ti.focus({preventScroll:true}),300);
+}
+
+/* ============ MISSION 4: READ THE SCAN ============ */
+function mission4(){
+  window.__busy=true;
+  const ROWS=[[21,'open','ftp','vsftpd 2.3.4'],[22,'open','ssh','OpenSSH 9.6p1'],[23,'closed','telnet',''],[80,'open','http','nginx 1.24.0'],[443,'open','https','nginx 1.24.0'],[3306,'open','mysql','MySQL 5.5.62'],[3389,'filtered','ms-wbt-server','']];
+  const STEPS=[
+    {type:'q',q:'First, the basics. How many ports are <b>open</b> on this server?',opts:['5','4','6','7'],a:0,why:'21, 22, 80, 443 and 3306 are open. 23 is closed and 3389 is filtered.'},
+    {type:'tap',q:'Tap the port that\'s running the company\'s <b>database</b>.',ok:p=>p===3306,why:'Port 3306 = MySQL, a database.'},
+    {type:'q',q:'Port 3389 shows <span class="s-filtered">filtered</span>. What does that most likely mean?',opts:['A firewall is blocking Nmap\'s probes, so it can\'t tell if it\'s open','The port is definitely open','The port was deleted','The server is turned off'],a:0,why:'Filtered = something (usually a firewall) is filtering the traffic, so Nmap can\'t tell whether the port is open.'},
+    {type:'q',q:'Which Nmap command most likely produced the <b>VERSION</b> column?',opts:['nmap -sV 10.0.0.5','nmap -sn 10.0.0.0/24','nmap --version','nmap -p 80,443 10.0.0.5'],a:0,mono:1,why:'-sV identifies the services and their versions. (--version just shows Nmap\'s own version!)'},
+    {type:'tap',q:'The IT team says: <i>"We stopped using file transfers years ago."</i> Tap the old, unnecessary service that should be shut down.',ok:p=>p===21,why:'Port 21 = FTP (File Transfer). It\'s unused and running an ancient version — a classic vulnerability. Closing it shrinks the attack surface.',after:'kill'},
+    {type:'q',q:'If an attacker stole customer data from that database, which goal of the CIA triad would be broken?',opts:['Confidentiality','Integrity','Availability','None — it\'s just a database'],a:0,why:'Stolen data = private information exposed = Confidentiality.'},
+    {type:'q',q:'In one sentence, Nmap helps answer which question?',opts:['What devices and services are exposed on this network?','How fast is my internet?','Who sent this email?','What\'s my password?'],a:0,why:'That\'s the big idea: before you can secure a network, you need to know what\'s exposed.'},
+  ];
+  let i=0,c=0,t=0,killed=false;
+  function table(tap){
+    return `<div class="scanwrap"><table class="scan"><thead><tr><th>PORT</th><th>STATE</th><th>SERVICE</th><th>VERSION</th></tr></thead><tbody>${
+      ROWS.map(([p,s,svc,v])=>`<tr class="${tap?'tap':''} ${killed&&p===21?'killed':''}" data-p="${p}"><td>${p}/tcp</td><td class="s-${killed&&p===21?'closed':s}">${killed&&p===21?'closed':s}</td><td>${svc}</td><td>${v}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  function show(){
+    const s=STEPS[i];
+    view(`<section class="screen">
+      ${brief('INCIDENT TICKET #4471','🏢',`NovaTech's IT team scanned their file server <code>10.0.0.5</code> (with permission ✔). Help them read the results.`,i,STEPS.length)}
+      <div class="card">
+        <pre class="code" style="margin-bottom:8px">$ nmap -sV 10.0.0.5
+Nmap scan report for files.novatech.local (10.0.0.5)
+Host is up (0.0031s latency).</pre>
+        ${table(s.type==='tap')}
+        <h2 class="q" style="margin-top:16px">${s.q}</h2>
+        <div id="qa"></div><div id="fb"></div>
+      </div>
+      <p style="text-align:right"><button class="btn sm ghost" id="quit">Exit to HQ</button></p></section>`);
+    $('#quit').onclick=hub;
+    if(s.type==='q'){
+      const order=shuffle(s.opts.map((_,k)=>k));
+      $('#qa').innerHTML=`<div class="opts">${order.map(k=>`<button class="opt ${s.mono?'mono':''}" data-k="${k}">${s.opts[k]}</button>`).join('')}</div>`;
+      $$('#qa .opt').forEach(b=>b.onclick=()=>{const ok=+b.dataset.k===s.a;
+        $$('#qa .opt').forEach(x=>{x.disabled=true;if(+x.dataset.k===s.a)x.classList.add('right')});if(!ok)b.classList.add('wrong');fin(ok)});
+    } else {
+      let done=false;
+      $$('.scan tr.tap').forEach(tr=>tr.onclick=async()=>{if(done)return;done=true;const p=+tr.dataset.p,ok=s.ok(p);
+        tr.classList.add(ok?'good':'bad');
+        if(!ok){const r=$$('.scan tr').find(x=>s.ok(+x.dataset.p));r&&r.classList.add('good')}
+        if(s.after==='kill'){await sleep(500);killed=true;const r=$('.scan tr[data-p="21"]');r.classList.add('killed');r.children[1].className='s-closed';r.children[1].textContent='closed';toast('🧱 Firewall rule added: DENY 21/tcp','')}
+        fin(ok)});
+    }
+    function fin(ok){t++;if(ok)c++;answer(ok);
+      $('#fb').innerHTML=`<div class="fb ${ok?'ok':'no'}"><b>${ok?rnd(PRAISE):'Not quite.'}</b>${s.why}</div><button class="btn primary" id="nx">${i<STEPS.length-1?'Next →':'Finish ✔'}</button>`;
+      $('#nx').onclick=()=>{i++;if(i<STEPS.length)show();else{window.__busy=false;missionDone('m4',c,t,'You turned raw scan output into real decisions — and closed an old FTP service, just like a real security team. One last challenge awaits…')}};
+      setTimeout(()=>$('#nx').scrollIntoView({behavior:'smooth',block:'nearest'}),50);
+    }
+  }
+  show();
+}
+
+/* ============ BOSS ============ */
+const BANK=[
+  {q:'In the CIA triad, the "A" stands for…',opts:['Availability','Authentication','Access','Antivirus'],a:0},
+  {q:'Which command discovers live hosts WITHOUT a port scan?',opts:['nmap -sn 192.168.1.0/24','nmap -sV 127.0.0.1','nmap -O 127.0.0.1','nmap -p 1-1000 127.0.0.1'],a:0,mono:1},
+  {q:'<code>nmap -O 127.0.0.1</code> attempts to…',opts:['Detect the operating system','Open every port','Output to a file','Scan only port 0'],a:0},
+  {q:'Port 21 is used for…',opts:['File Transfer (FTP)','HTTP','MySQL','Remote Desktop'],a:0},
+  {q:'Port 80 is used for…',opts:['HTTP (web)','FTP','MySQL','Email'],a:0},
+  {q:'Port 3306 belongs to…',opts:['MySQL','HTTP','FTP','SSH'],a:0},
+  {q:'A weakness an attacker could take advantage of is a…',opts:['Vulnerability','Threat','Defense','Packet'],a:0},
+  {q:'An attempt to exploit a vulnerability is called a(n)…',opts:['Attack','Threat','Defense','Scan'],a:0},
+  {q:'Wireshark is like a ___ for network traffic.',opts:['Microscope','Megaphone','Vacuum','Lock'],a:0},
+  {q:'Which tool tests websites and web apps for vulnerabilities?',opts:['Burp Suite','Nmap','Wireshark','Firewall'],a:0},
+  {q:'Which tool tests KNOWN vulnerabilities to evaluate security?',opts:['Metasploit','Wireshark','Kali Linux','Firewall'],a:0},
+  {q:'<code>127.0.0.1</code> refers to…',opts:['Your own computer (localhost)','The router','Google','The whole internet'],a:0},
+  {q:'Which Wireshark column tells you how BIG a packet is?',opts:['Length','Protocol','Source','Time'],a:0},
+  {q:'Nmap stands for…',opts:['Network Mapper','New Map','Node Manager','Net Malware Protector'],a:0},
+  {q:'<code>nmap -p 80,443 127.0.0.1</code> scans…',opts:['Only ports 80 and 443','Ports 80 through 443','Every port except 80 and 443','80 different computers'],a:0},
+  {q:'Someone edits data without permission. Which CIA goal broke?',opts:['Integrity','Confidentiality','Availability','None'],a:0},
+  {q:'Which of these is OK to scan with Nmap?',opts:['Your own computer or a lab you control','Your school\'s network, without asking','A random website','Your neighbour\'s Wi-Fi'],a:0},
+  {q:'<code>nmap -A</code> enables…',opts:['Several advanced detection features','Only ARP packets','Anonymous mode','A single port'],a:0,mono:0},
+  {q:'Wireshark captures small pieces of data called…',opts:['Packets','Pixels','Tokens','Frames per second'],a:0},
+  {q:'Which tool monitors and filters traffic to block unauthorized connections?',opts:['Firewall','Burp Suite','Nmap','Wireshark'],a:0},
+  {q:'<code>nmap --version</code>…',opts:['Shows the installed Nmap version','Scans for service versions','Updates Nmap','Detects the OS'],a:0},
+  {q:'A "filtered" port in Nmap usually means…',opts:['Something like a firewall blocks the probe','It\'s definitely open','It\'s been deleted','It\'s encrypted'],a:0},
+  {q:'In Wireshark, "Source" means…',opts:['Where the data came from','Where the data is going','The type of protocol','The packet size'],a:0},
+  {q:'Which flag identifies service VERSIONS?',opts:['-sV','-sn','-O','--version'],a:0,mono:1},
+];
+function bossIntro(){
+  view(`<section class="screen card alarm" style="text-align:center;padding:34px 20px;border-color:rgba(255,77,109,.6)">
+    <div class="kicker" style="color:var(--red)">⚠ Priority alert</div>
+    <h2 class="disp" style="font-size:clamp(26px,6vw,46px);margin:12px 0;color:#fff;text-shadow:0 0 18px rgba(255,45,85,.8)">INTRUSION<br>SHOWDOWN</h2>
+    <p style="max-width:520px;margin:0 auto 10px;line-height:1.6">The intruder at <code>192.168.1.66</code> is fighting back. You get <b>10 questions</b> with <b>12 seconds</b> each. Fast answers earn bonus points. Every miss knocks down the network's integrity.</p>
+    <p class="dim" style="margin:0 0 22px">Keep integrity above 0% to save the network.</p>
+    <button class="btn primary" id="go" style="background:linear-gradient(135deg,#ff2d55,#ff8a3d);font-size:17px;padding:14px 26px">DEFEND THE NETWORK ▶</button>
+  </section>`);
+  sfx.alarm();
+  $('#go').onclick=boss;
+}
+function boss(){
+  window.__busy=true;
+  const qs=shuffle(BANK).slice(0,10).map(q=>({...q,order:shuffle(q.opts.map((_,k)=>k))}));
+  let i=0,score=0,integ=100,c=0,timer=null;
+  const T=12;
+  function show(){
+    const q=qs[i];let left=T;const t0=performance.now();
+    view(`<section class="screen card ${integ<=40?'alarm':''}" style="border-color:rgba(255,77,109,.45)">
+      <div class="boss-hud"><div><div class="qtop" style="margin:0 0 6px"><span class="kicker" style="color:var(--red)">Network integrity</span><span>${integ}%</span></div><div class="integ"><i style="width:${integ}%"></i></div></div>
+      <div class="mono" style="text-align:right"><div class="dim" style="font-size:11px">SCORE</div><b style="font-size:22px;color:var(--amber)">${score}</b></div></div>
+      <div class="qtop"><span>Question ${i+1} / ${qs.length}</span><span id="secs">${T}s</span></div>
+      <div class="timer"><i id="tb" style="width:100%"></i></div>
+      <h2 class="q">${q.q}</h2>
+      <div class="opts">${q.order.map(k=>`<button class="opt ${q.mono?'mono':''}" data-k="${k}">${q.opts[k]}</button>`).join('')}</div>
+      <div id="fb"></div></section>`);
+    $$('.opt').forEach(b=>b.onclick=()=>resolve(+b.dataset.k,b));
+    let lastS=T;
+    timer=setInterval(()=>{const el=(performance.now()-t0)/1000;left=Math.max(0,T-el);
+      const tb=$('#tb');if(!tb)return;tb.style.width=(left/T*100)+'%';const s=Math.ceil(left);$('#secs').textContent=s+'s';
+      if(s!==lastS){lastS=s;if(s<=3)sfx.tick()}
+      if(left<=0)resolve(-1,null)},50);
+    function resolve(k,btn){
+      clearInterval(timer);if(!$('.opt')||$('.opt').disabled)return;
+      const ok=k===q.a;$$('.opt').forEach(b=>{b.disabled=true;if(+b.dataset.k===q.a)b.classList.add('right')});
+      if(btn&&!ok)btn.classList.add('wrong');
+      let pts=0;
+      if(ok){c++;pts=100+Math.round(left*15);score+=pts;answer(true,pts)}else{answer(false);integ=Math.max(0,integ-15)}
+      $('#fb').innerHTML=`<div class="fb ${ok?'ok':'no'}"><b>${ok?`Blocked! +${pts} pts`:k===-1?'⏱ Too slow — the attacker got through!':'Breach! The attacker moved deeper.'}</b>${ok?'':`Correct answer: <b>${q.opts[q.a]}</b>`}</div>`;
+      setTimeout(()=>{i++;if(i<qs.length&&integ>0)show();else end()},ok?900:1700);
+    }
+  }
+  function end(){
+    window.__busy=false;
+    const saved=integ>0;
+    if(saved){score+=integ*5}
+    if(!S.boss||score>S.boss.score)S.boss={score,c,saved,integ};save();
+    if(saved){sfx.win();confetti(120)}else sfx.alarm();
+    view(`<section class="screen card" style="text-align:center;padding:34px 20px">
+      <div class="kicker" style="color:${saved?'var(--green)':'var(--red)'}">${saved?'Threat neutralized':'Network breached'}</div>
+      <h2 class="disp glow" style="font-size:clamp(24px,5vw,40px);margin:10px 0">${saved?'NETWORK SAVED 🛡️':'SYSTEM COMPROMISED 💀'}</h2>
+      <p style="font-size:17px">${c} / ${i} correct · integrity ${integ}%${saved?` · +${integ*5} survival bonus`:''}</p>
+      <p class="mono" style="font-size:30px;color:var(--amber);margin:6px 0 20px">${score} pts</p>
+      <div class="row" style="justify-content:center"><button class="btn primary" id="cert">🏅 Get my certificate</button><button class="btn" id="again">↻ Retry showdown</button></div>
+    </section>`);
+    $('#cert').onclick=certificate;$('#again').onclick=bossIntro;
+  }
+  show();
+}
+
+function certificate(){
+  const acc=S.total?Math.round(S.correct/S.total*100):0;
+  const R=[[95,'ELITE DEFENDER','🦾'],[85,'NETWORK NINJA','🥷'],[70,'SOC ANALYST','🛡️'],[50,'JUNIOR ANALYST','🔎'],[0,'SCRIPT KIDDIE (in training)','🐣']];
+  const [,rank,ic]=R.find(r=>acc>=r[0]);
+  const st=MISSIONS.map(m=>S.done[m.id]?stars(S.done[m.id].c,S.done[m.id].t):0).reduce((a,b)=>a+b,0);
+  view(`<section class="screen cert">
+    <div class="kicker">Society of Cybersecurity · Certificate of Completion</div>
+    <div style="font-size:54px;margin-top:14px">${ic}</div>
+    <p class="dim" style="margin:6px 0 0">This certifies that agent</p>
+    <h2 class="disp" style="font-size:clamp(22px,5vw,34px);margin:6px 0;color:#fff">${esc(S.name)}</h2>
+    <p class="dim" style="margin:0">has completed Operation: Packet Hunt with the rank of</p>
+    <div class="rank glow">${rank}</div>
+    <div class="statgrid">
+      <div><b>${S.xp}</b><small>Total XP</small></div>
+      <div><b>${acc}%</b><small>Accuracy</small></div>
+      <div><b>${S.best}</b><small>Best streak</small></div>
+      <div><b>${st}/12</b><small>Mission stars</small></div>
+      <div><b>${S.boss?S.boss.score:'—'}</b><small>Showdown score</small></div>
+    </div>
+    <p class="dim" style="font-size:13px;margin:0 0 18px">📸 Screenshot this and show your instructor! Want more? Practice legally on Hack The Box.</p>
+    <div class="row" style="justify-content:center"><button class="btn primary" id="hq">Back to HQ</button></div>
+  </section>`);
+  $('#hq').onclick=hub;
+}
+
+/* ============ start ============ */
+load();
+if(S.name)hub();else boot();
+</script>
+</body>
+</html>
